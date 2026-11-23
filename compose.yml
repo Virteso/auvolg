@@ -41,6 +41,7 @@ services:
     volumes:
       - ./haproxy/conf:/usr/local/etc/haproxy/conf:ro
       - ./haproxy/entrypoint.sh:/entrypoint.sh:ro
+      - ./haproxy/generate-routes.sh:/generate-routes.sh:ro
       - ./src:/usr/share/site/src:ro
       - ./assets:/usr/share/site/assets:ro
       - staticfiles:${STATIC_DIR:-/staticfiles}

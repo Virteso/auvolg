@@ -14,8 +14,11 @@ This directory is the HAProxy equivalent of the original `nginx/` setup. The
     `.if streq("$PIPELINE",production)`.
   - `30-https.cfg` — port 443 TLS frontend (HTTP/2, HTTP/3, Alt-Svc), only in
     production.
-- `entrypoint.sh` — small runtime script. It waits for the Bun build marker,
-  then generates only the bits HAProxy cannot express statically:
+- `entrypoint.sh` — runtime/startup only: waits for the Bun build marker,
+  validates env/certs, runs route generation, checks config, starts HAProxy, and
+  reloads it on config/site changes.
+- `generate-routes.sh` — generates only the bits HAProxy cannot express
+  statically:
   - `generated/bufsize.cfg` — `global` + `tune.bufsize` sized to the largest
     served file (HAProxy loads `file` payloads into buffers at config parse).
   - `generated/static_backend.cfg` — `backend be_static` with one

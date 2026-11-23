@@ -15,16 +15,18 @@ RUN mkdir -p /etc/haproxy/certs \
              /run/haproxy/generated \
     && chown -R haproxy:haproxy /run/haproxy
 
-# Static config (mostly hand-edited) + entrypoint (generates only routes/bufsize).
+# Static config (hand-edited) + scripts (startup and route generation).
 COPY haproxy/conf/ /usr/local/etc/haproxy/conf/
 COPY haproxy/entrypoint.sh /entrypoint.sh
+COPY haproxy/generate-routes.sh /generate-routes.sh
 COPY haproxy/favicon.ico /usr/local/etc/haproxy/files/favicon.ico
 
 # Put the certificate + private key in haproxy/certs/site.pem (fullchain first,
 # then the key) before building. Only a concatenated PEM bundle is supported.
 COPY --chown=haproxy:haproxy haproxy/certs/ /etc/haproxy/certs/
 
-RUN sed -i 's/\r$//' /entrypoint.sh && chmod +x /entrypoint.sh
+RUN sed -i 's/\r$//' /entrypoint.sh /generate-routes.sh \
+    && chmod +x /entrypoint.sh /generate-routes.sh
 
 EXPOSE 80 443 443/udp
 

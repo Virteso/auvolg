@@ -1,0 +1,7 @@
+# IDE dirs
+.vscode/
+.idea/
+
+# Environment
+*.env*
+!*.env.example

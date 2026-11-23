@@ -1,0 +1,40 @@
+# Hidden files aren't needed
+.*
+
+# Container configs aren't needed inside them
+docker*
+Docker*
+
+# Documentation
+/abiks/
+/docs/
+/site/
+/DB structure/
+*.md
+
+# IDE dirs
+.vscode/
+.idea/
+
+# Django and others
+reWiLDsite.code-workspace
+staticfiles/
+reWiLD/Lib/
+.devcontainer/
+
+# Python files
+__pycache__/
+*.pyc
+
+# Drawio files
+*.dtmp
+*.bkp
+
+# Environment
+*.env*
+
+# Development
+/pyproject.toml
+/mkdocs.yml
+/scripts/
+/.github/

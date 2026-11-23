@@ -1,0 +1,37 @@
+FROM docker.io/nginx:stable-alpine
+
+# Add nginx.org repository and install packages
+RUN apk add --no-cache \
+	certbot \
+	certbot-nginx \
+	ca-certificates \
+	inotify-tools
+
+# Create nginx directories
+RUN mkdir -p /etc/nginx/sites-enabled \
+	/var/lib/letsencrypt \
+	/var/cache/certbot
+
+# Copy nginx configuration
+COPY nginx/nginx.conf /etc/nginx/nginx.conf
+COPY nginx/snippets/ /etc/nginx/snippets/
+COPY nginx/prod.conf /etc/nginx/prod.conf
+COPY nginx/dev.conf /etc/nginx/dev.conf
+# Remove default nginx config that conflicts with our config
+RUN rm -f /etc/nginx/conf.d/default.conf
+
+# Copy favicon
+COPY nginx/favicon.ico /favicon.ico
+
+# Copy static site content
+COPY src/ /usr/share/site/src/
+COPY assets/ /usr/share/site/assets/
+
+# Copy entrypoint script
+COPY nginx/entrypoint.sh /entrypoint.sh
+RUN sed -i 's/\r$//' /entrypoint.sh && chmod +x /entrypoint.sh
+
+EXPOSE 80 443 443/udp
+
+ENTRYPOINT ["/entrypoint.sh"]
+CMD ["./entrypoint.sh"]

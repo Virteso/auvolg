@@ -1,0 +1,31 @@
+FROM docker.io/haproxy:3.2-alpine
+
+# Build steps need root; the final image runs as the unprivileged `haproxy`
+# user. Production binds 80/443 via net.ipv4.ip_unprivileged_port_start=80
+# (set in compose.yml), so no root is required at runtime.
+USER root
+
+# inotify-tools is used by entrypoint.sh to reload the generated config when
+# host-mounted site files or the template change (development convenience).
+RUN apk add --no-cache inotify-tools
+
+RUN mkdir -p /etc/haproxy/certs \
+             /usr/local/etc/haproxy/files \
+             /run/haproxy/generated \
+    && chown -R haproxy:haproxy /run/haproxy
+
+# haproxy.cfg is a template; entrypoint.sh renders it into /run/haproxy.
+COPY haproxy/haproxy.cfg /usr/local/etc/haproxy/haproxy.cfg.template
+COPY haproxy/entrypoint.sh /entrypoint.sh
+COPY haproxy/favicon.ico /usr/local/etc/haproxy/files/favicon.ico
+
+# Put the certificate + private key in haproxy/certs/site.pem (fullchain first,
+# then the key) before building. Only a concatenated PEM bundle is supported.
+COPY --chown=haproxy:haproxy haproxy/certs/ /etc/haproxy/certs/
+
+RUN sed -i 's/\r$//' /entrypoint.sh && chmod +x /entrypoint.sh
+
+EXPOSE 80 443 443/udp
+
+USER haproxy
+ENTRYPOINT ["/entrypoint.sh"]

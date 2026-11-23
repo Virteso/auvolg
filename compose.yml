@@ -1,0 +1,97 @@
+services:
+  # Frontend JS build service
+  bun:
+    image: docker.io/oven/bun:alpine
+    working_dir: /js
+    restart: on-failure:3
+    volumes:
+      - ./js:/js
+      - staticfiles:${STATIC_DIR:-/staticfiles}
+    environment:
+      PIPELINE: ${PIPELINE:-production}
+      STATIC_DIR: ${STATIC_DIR:-/staticfiles}
+      BUILD_MARKER: ${STATIC_DIR:-/staticfiles}/.bun-build-complete
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        # Remove completion marker before rebuilding if it exists
+        rm -f "$$BUILD_MARKER"
+        bun install
+        bun run build.js &
+        PID=$$!
+        trap 'kill -TERM $$PID' SIGTERM SIGINT
+        wait "$$PID"
+
+  # HAProxy: TLS termination, HTTP/2 + HTTP/3, and static file serving.
+  # Certificates are baked into the image from haproxy/certs/site.pem.
+  haproxy:
+    build:
+      context: .
+      dockerfile: haproxy/Dockerfile.haproxy
+    stop_signal: SIGTERM
+    restart: on-failure:3
+    # Allow the unprivileged haproxy user to bind 80/443 inside the container.
+    sysctls:
+      net.ipv4.ip_unprivileged_port_start: "80"
+    ports:
+      - "${PORT_HTTP:-8080}:80"
+      - "${PORT_HTTPS:-8443}:443/tcp"
+      - "${PORT_HTTPS:-8443}:443/udp"
+    volumes:
+      - ./haproxy/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg.template:ro
+      - ./haproxy/entrypoint.sh:/entrypoint.sh:ro
+      - ./src:/usr/share/site/src:ro
+      - ./assets:/usr/share/site/assets:ro
+      - staticfiles:${STATIC_DIR:-/staticfiles}
+    environment:
+      PIPELINE: ${PIPELINE:-production}
+      STATIC_DIR: ${STATIC_DIR:-/staticfiles}
+      SITE_DIR: /usr/share/site/src
+      ASSETS_DIR: /usr/share/site/assets
+      DOMAIN: ${DOMAIN}
+      PORT_HTTP: ${PORT_HTTP:-8080}
+      PORT_HTTPS: ${PORT_HTTPS:-8443}
+    depends_on:
+      - bun
+
+
+  # # Nginx reverse proxy service
+  # nginx:
+  #   build:
+  #     context: .
+  #     dockerfile: nginx/Dockerfile.nginx
+  #   restart: on-failure:3
+  #   ports:
+  #     - "${PORT_HTTP:-8080}:80"
+  #     - "${PORT_HTTPS:-8443}:443/tcp"
+  #     - "${PORT_HTTPS:-8443}:443/udp"
+  #   volumes:
+  #     - ./nginx/nginx.conf:/etc/nginx/nginx.conf
+  #     - ./nginx/snippets:/etc/nginx/snippets
+  #     - ./nginx/dev.conf:/etc/nginx/dev.conf:ro
+  #     - ./nginx/prod.conf:/etc/nginx/prod.conf
+  #     - ./nginx/favicon.ico:/favicon.ico:ro
+  #     - ./nginx/entrypoint.sh:/entrypoint.sh:ro
+  #     - ./src:/usr/share/site/src:ro
+  #     - ./assets:/usr/share/site/assets:ro
+  #     - staticfiles:${STATIC_DIR:-/staticfiles}
+  #     - letsencrypt:/etc/letsencrypt
+  #     - certbot_cache:/var/cache/certbot
+  #   environment:
+  #     PIPELINE: ${PIPELINE:-production}
+  #     LETSENCRYPT_EMAIL: ${LETSENCRYPT_EMAIL}
+  #     STATIC_DIR: ${STATIC_DIR:-/staticfiles}
+  #     SITE_DIR: /usr/share/site/src
+  #     ASSETS_DIR: /usr/share/site/assets
+  #     DOMAIN: ${DOMAIN}
+  #     PORT_HTTP: ${PORT_HTTP:-8080}
+  #     PORT_HTTPS: ${PORT_HTTPS:-8443}
+  #   depends_on:
+  #     - bun
+
+
+volumes:
+  staticfiles:
+  # letsencrypt:
+  # certbot_cache:

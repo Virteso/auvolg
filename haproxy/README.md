@@ -4,33 +4,34 @@ This directory is the HAProxy equivalent of the original `nginx/` setup. The
 `nginx/` directory is kept only as a reference and is no longer used by
 `compose.yml`.
 
-## How it works
+## Layout
 
-- `Dockerfile.haproxy` starts from `haproxy:3.2-alpine` and builds the
-  certificate bundle from `certs/site.pem` into the image. There is no certbot,
-  no ACME client and no automatic renewal. The image runs entirely as the
-  unprivileged `haproxy` user.
-- The container always binds 80/443. `PORT_HTTP` / `PORT_HTTPS` only control the
-  host-side port mapping in `compose.yml`. The
-  `net.ipv4.ip_unprivileged_port_start=80` sysctl allows the unprivileged user
-  to bind these ports, so root is not required.
-- `entrypoint.sh` waits for the Bun build marker, then walks the site
-  directories and generates:
-  - one `http-request return ... file ...` rule per static file (HAProxy serves
-    the files directly, without another web server);
-  - `Cache-Control`, CSP, Permissions-Policy, ETag and Last-Modified headers;
-  - 304 responses for `If-None-Match` / `If-Modified-Since`;
-  - gzip variants from `js/gzip.js` `.gz` sidecars, or freshly generated ones
-    for source files such as `index.html` and `styles.css`;
-  - `tune.bufsize` sized to the largest served file (HAProxy loads returned
-    files into a buffer at config load).
-- The config template is `haproxy.cfg`. Rendered output lives in
-  `/run/haproxy/generated/haproxy.cfg` inside the container.
-- In production, HTTP redirects to HTTPS and TLS is terminated by HAProxy with
-  HTTP/2, HTTP/3 (QUIC) and `Alt-Svc`. In development, everything is served over
-  HTTP only.
-- Host-mounted config/site changes are picked up by an inotify watcher; the
-  config is regenerated, validated, and HAProxy is reloaded with `SIGUSR2`.
+- `conf/` — **static**, hand-editable HAProxy config, loaded in filename order:
+  - `00-global.cfg` — globals (maxconn, TLS defaults, logging). `tune.bufsize` is
+    *not* here; the entrypoint generates it.
+  - `10-defaults.cfg` — HTTP mode, timeouts, logging options.
+  - `20-http.cfg` — port 80 frontend; in production redirects to HTTPS via
+    `.if streq("$PIPELINE",production)`.
+  - `30-https.cfg` — port 443 TLS frontend (HTTP/2, HTTP/3, Alt-Svc), only in
+    production.
+- `entrypoint.sh` — small runtime script. It waits for the Bun build marker,
+  then generates only the bits HAProxy cannot express statically:
+  - `generated/bufsize.cfg` — `global` + `tune.bufsize` sized to the largest
+    served file (HAProxy loads `file` payloads into buffers at config parse).
+  - `generated/static_backend.cfg` — `backend be_static` with one
+    `http-request return ... file ...` rule per static file, plus
+    Cache-Control/CSP/Permissions-Policy/ETag/Last-Modified, 304 rules, gzip
+    variants (`.gz` sidecars from `js/gzip.js` or freshly compressed), and a 404
+    fallback.
+- `Dockerfile.haproxy` — `haproxy:3.2-alpine`, bakes in `conf/`, favicon, certs;
+  runs as the unprivileged `haproxy` user.
+- `certs/` — `site.pem` (fullchain + key) is baked into the image. No certbot /
+  no automatic renewal.
+
+The container runs as `haproxy -f conf -f generated` (HAProxy merges multiple
+config files/directories). Host-mounted `conf/`, `src/`, `assets/`, and
+`staticfiles` are watched by inotify; on change the generated fragments are
+regenerated, the full config is validated, and HAProxy is reloaded via `SIGUSR2`.
 
 ## Routes
 
@@ -43,12 +44,18 @@ This directory is the HAProxy equivalent of the original `nginx/` setup. The
 | `/script.js`        | `STATIC_DIR/script.js`                          |
 | `/favicon.ico`      | `haproxy/favicon.ico`                           |
 
+## Ports / TLS
+
+The container always binds 80/443. `PORT_HTTP`/`PORT_HTTPS` in `.env` only map
+host ports. `compose.yml` sets `net.ipv4.ip_unprivileged_port_start=80` so the
+unprivileged user can bind 80/443 — no root required. Production uses HTTP/2,
+HTTP/3 (QUIC), and `Alt-Svc`; development serves plain HTTP only.
+
 ## Limitations compared with nginx
 
-- HAProxy has no `try_files`, so only files that exist at config generation
-  time are served; new files trigger a reload via the inotify watcher.
-- `Expires` is not emitted for `/favicon.ico` (only `Cache-Control` is).
-- Rewrites/run-time PHP/WSGI-style upstreams are not supported; this is a
-  static site only.
+- HAProxy has no `try_files`, so only files present at generation time are
+  served; new files are picked up by the inotify reload.
+- `Expires` is not emitted for `/favicon.ico` (only `Cache-Control`).
+- Static files only; no runtime upstream/proxying.
 
 See `certs/README.md` for certificate and renewal instructions.

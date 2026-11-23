@@ -5,17 +5,18 @@ FROM docker.io/haproxy:3.2-alpine
 # (set in compose.yml), so no root is required at runtime.
 USER root
 
-# inotify-tools is used by entrypoint.sh to reload the generated config when
-# host-mounted site files or the template change (development convenience).
+# inotify-tools is used by entrypoint.sh to reload generated fragments when
+# host-mounted site files or config change (development convenience).
 RUN apk add --no-cache inotify-tools
 
 RUN mkdir -p /etc/haproxy/certs \
+             /usr/local/etc/haproxy/conf \
              /usr/local/etc/haproxy/files \
              /run/haproxy/generated \
     && chown -R haproxy:haproxy /run/haproxy
 
-# haproxy.cfg is a template; entrypoint.sh renders it into /run/haproxy.
-COPY haproxy/haproxy.cfg /usr/local/etc/haproxy/haproxy.cfg.template
+# Static config (mostly hand-edited) + entrypoint (generates only routes/bufsize).
+COPY haproxy/conf/ /usr/local/etc/haproxy/conf/
 COPY haproxy/entrypoint.sh /entrypoint.sh
 COPY haproxy/favicon.ico /usr/local/etc/haproxy/files/favicon.ico
 

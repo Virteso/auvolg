@@ -39,7 +39,7 @@ services:
       - "${PORT_HTTPS:-8443}:443/tcp"
       - "${PORT_HTTPS:-8443}:443/udp"
     volumes:
-      - ./haproxy/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg.template:ro
+      - ./haproxy/conf:/usr/local/etc/haproxy/conf:ro
       - ./haproxy/entrypoint.sh:/entrypoint.sh:ro
       - ./src:/usr/share/site/src:ro
       - ./assets:/usr/share/site/assets:ro

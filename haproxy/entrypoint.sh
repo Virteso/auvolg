@@ -1,6 +1,8 @@
 #!/bin/sh
-# Render an HAProxy config that serves the whole static site from HAProxy itself,
-# wait for the Bun build, then run HAProxy with a dev-friendly reload watcher.
+# Generate HAProxy route/buffer fragments for the static site, wait for the Bun
+# build, then run HAProxy. The structural config lives in static /conf files
+# (see haproxy/conf/*.cfg); this script only generates what HAProxy cannot do
+# declaratively: per-file routes and tune.bufsize sized to the largest file.
 #
 # There is intentionally no ACME/certbot logic here: the TLS bundle is baked
 # into the image at /etc/haproxy/certs/site.pem (see haproxy/certs/README.md).
@@ -29,15 +31,14 @@ SITE_DIR="${SITE_DIR:-/usr/share/site/src}"
 ASSETS_DIR="${ASSETS_DIR:-/usr/share/site/assets}"
 BUILD_MARKER="${BUILD_MARKER:-${STATIC_DIR}/.bun-build-complete}"
 
-TEMPLATE="${HAPROXY_TEMPLATE:-/usr/local/etc/haproxy/haproxy.cfg.template}"
-TEMPLATE_DIR="$(dirname "$TEMPLATE")"
+CONF_DIR="${HAPROXY_CONF_DIR:-/usr/local/etc/haproxy/conf}"
 CERT_FILE="${CERT_FILE:-/etc/haproxy/certs/site.pem}"
 FAVICON="/usr/local/etc/haproxy/files/favicon.ico"
 
 GEN_DIR="/run/haproxy/generated"
 COMPRESSED_DIR="$GEN_DIR/compressed"
-BACKEND_FILE="$GEN_DIR/static_backend.txt"
-CONFIG_FILE="$GEN_DIR/haproxy.cfg"
+BACKEND_FILE="$GEN_DIR/static_backend.cfg"
+BUF_FILE="$GEN_DIR/bufsize.cfg"
 mkdir -p "$GEN_DIR" "$COMPRESSED_DIR"
 
 CSP="default-src 'none'; base-uri 'none'; form-action 'self'; script-src 'self'; connect-src 'self'; style-src 'self'; img-src 'self' data:"
@@ -174,7 +175,7 @@ add_tree() {
 }
 
 # ---------------------------------------------------------------------------
-# Config generation
+# Config generation (only generated fragments, not the full config)
 # ---------------------------------------------------------------------------
 
 generate_config() {
@@ -197,7 +198,7 @@ generate_config() {
 		printf '\nbackend be_static\n    mode http\n'
 		cat "$RULES_FILE"
 		printf '    http-request return status 404 content-type "text/plain; charset=utf-8" string "Not Found"\n'
-	} >"$GEN_DIR/static_backend.txt"
+	} >"$GEN_DIR/static_backend.cfg"
 
 	# tune.bufsize must fit the largest payload plus response headers/rewrite.
 	{
@@ -210,39 +211,12 @@ generate_config() {
 	[ -n "$max_size" ] || max_size=0
 	buf_size=$(( (max_size + 16384 + 1023) / 1024 * 1024 ))
 	[ "$buf_size" -lt 16384 ] && buf_size=16384
-	printf '    tune.bufsize %s\n' "$buf_size" >"$GEN_DIR/buf_size_line.txt"
+	{
+		printf 'global\n'
+		printf '    tune.bufsize %s\n' "$buf_size"
+	} >"$BUF_FILE"
 
-	if [ "$PIPELINE" = "production" ]; then
-		printf '    http-request redirect location https://%s%%[capture.req.uri] code 301\n' \
-			"$DOMAIN" >"$GEN_DIR/http_rules.txt"
-		{
-			printf '%s\n' 'frontend fe_https'
-			printf '    bind :443 ssl crt %s alpn h2,http/1.1\n' "$CERT_FILE"
-			printf '    bind :::443 ssl crt %s alpn h2,http/1.1 v6only\n' "$CERT_FILE"
-			printf '    bind quic4@:443 ssl crt %s alpn h3\n' "$CERT_FILE"
-			printf '    bind quic6@[::]:443 ssl crt %s alpn h3 v6only\n' "$CERT_FILE"
-			printf '%s\n' '    http-after-response set-header Alt-Svc "h3=\":443\"; ma=86400"'
-			printf '%s\n' '    default_backend be_static'
-		} >"$GEN_DIR/https_frontend.txt"
-	else
-		: >"$GEN_DIR/http_rules.txt"
-		: >"$GEN_DIR/https_frontend.txt"
-	fi
-
-	awk -v gen="$GEN_DIR" '
-		/^@@[A-Z_]+@@$/ {
-			token = $0
-			sub(/^@@/, "", token)
-			sub(/@@$/, "", token)
-			fragment = gen "/" tolower(token) ".txt"
-			while ((getline line < fragment) > 0) print line
-			close(fragment)
-			next
-		}
-		{ print }
-	' "$TEMPLATE" >"$CONFIG_FILE"
-
-	echo "Generated $CONFIG_FILE (bufsize=${buf_size}, $(wc -l <"$GEN_DIR/static_backend.txt") backend lines)"
+	echo "Generated $BACKEND_FILE and $BUF_FILE (bufsize=${buf_size}, $(wc -l <"$BACKEND_FILE") backend lines)"
 }
 
 wait_for_static_files() {
@@ -262,16 +236,16 @@ wait_for_static_files() {
 }
 
 watch_changes() {
-	echo "Watching site files and template for changes..."
+	echo "Watching site files and config for changes..."
 	while inotifywait -q -r -e close_write,moved_to,create,delete,modify \
-		"$TEMPLATE_DIR" "$SITE_DIR" "$ASSETS_DIR" "$STATIC_DIR"; do
+		"$CONF_DIR" "$SITE_DIR" "$ASSETS_DIR" "$STATIC_DIR"; do
 		# Coalesce a burst of writes into one reload.
 		while inotifywait -q -t 2 -e close_write,moved_to,create,delete,modify \
-			"$TEMPLATE_DIR" "$SITE_DIR" "$ASSETS_DIR" "$STATIC_DIR"; do
+			"$CONF_DIR" "$SITE_DIR" "$ASSETS_DIR" "$STATIC_DIR"; do
 			:
 		done
 		generate_config || continue
-		if haproxy -c -f "$CONFIG_FILE" >/dev/null 2>&1; then
+		if haproxy -c -f "$CONF_DIR" -f "$GEN_DIR" >/dev/null 2>&1; then
 			kill -USR2 "$HAPROXY_PID" 2>/dev/null || true
 			echo "HAProxy config reloaded"
 		else
@@ -287,8 +261,8 @@ watch_changes() {
 wait_for_static_files
 generate_config
 
-if ! haproxy -c -f "$CONFIG_FILE"; then
-	echo "ERROR: generated HAProxy config is invalid." >&2
+if ! haproxy -c -f "$CONF_DIR" -f "$GEN_DIR"; then
+	echo "ERROR: HAProxy config is invalid." >&2
 	exit 1
 fi
 
@@ -299,7 +273,7 @@ else
 fi
 
 echo "Starting HAProxy..."
-haproxy -W -db -f "$CONFIG_FILE" &
+haproxy -W -db -f "$CONF_DIR" -f "$GEN_DIR" &
 HAPROXY_PID=$!
 
 watch_changes &

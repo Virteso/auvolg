@@ -16,6 +16,11 @@ BUN_MAX_WAIT="${BUN_MAX_WAIT:-120}"
 DOMAIN="${DOMAIN}"
 PIPELINE="${PIPELINE:-production}"
 
+if [ "$PIPELINE" = "production" ] && [ -z "$DOMAIN" ]; then
+	echo "ERROR: DOMAIN must be set in production." >&2
+	exit 1
+fi
+
 CERT_DIR="/etc/letsencrypt/live/$DOMAIN"
 EMAIL="${LETSENCRYPT_EMAIL:-mail@example.com}"
 
@@ -179,7 +184,8 @@ if [ -f "$CERT_DIR/fullchain.pem" ] && [ -f "$CERT_DIR/privkey.pem" ]; then
 
     start_nginx
 else
-    echo "No certificate found. Starting temporary nginx for certificate generation..."
+    echo "No certificate found. Using the dev config to obtain one..."
+    ln -sf /etc/nginx/dev.conf /etc/nginx/sites-enabled/server.conf
 
     # Start nginx in background so certbot-nginx can inspect and update the live server config
     nginx -g "daemon off;" &
@@ -209,6 +215,9 @@ else
     # Stop background nginx
     kill $NGINX_PID 2>/dev/null || true
     wait $NGINX_PID 2>/dev/null || true
+
+    # Switch back to the production config now that the certbot files exist
+    ln -sf "$CONFIG_SOURCE" /etc/nginx/sites-enabled/server.conf
 
     # Start nginx normally
     start_nginx

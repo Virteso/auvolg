@@ -1,0 +1,29 @@
+# Some files aren't needed in production server, but can't be ignored elsewhere so can be added here
+#
+# This is an rsync filter file, NOT a gitignore file.
+#   * Patterns need an explicit "- " (exclude) or "+ " (include).
+#   * First matching rule wins. So every "+ " rule that explicitly includes something must appear above the "- " rule it overrides.
+
+# Keep
+
+# Protect (don't delete or create)
+P /js/node_modules/
+
+# Documentation
+- *.md
+- *.txt
+- *.service
+
+# Hidden files
+- .*
+
+# IDE dirs
+- .vscode/
+- .idea/
+
+# Environment
+- .env
+- *.env*
+
+# Development helpers
+- /.github/

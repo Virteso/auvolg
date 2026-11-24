@@ -1,0 +1,88 @@
+name: Deploy to Production
+
+on:
+  push:
+    branches:
+      - release
+
+jobs:
+  deploy:
+    # Rsync and ssh is quite light so a light VM is sufficient
+    runs-on: ubuntu-slim
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout Code
+        timeout-minutes: 1
+        uses: actions/checkout@v4
+
+      - name: Sync changed files via Rsync
+        timeout-minutes: 2
+        env:
+          SSH_KEY: ${{ secrets.DEPLOYMENT_SSH_KEY }}
+        run: |
+          echo "-> Setting up SSH key..."
+          # Set up SSH key securely in memory
+          mkdir -p ~/.ssh
+          echo "$SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+
+          echo "-> Syncing files via rsync..."
+          # Run native rsync
+          rsync -avzi --delete \
+            -e "ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no -p 22" \
+            --exclude=.env \
+            --exclude=.git \
+            --filter="merge .deployignore" \
+            ./ ${{ secrets.DEPLOYMENT_USER }}@${{ secrets.DEPLOYMENT_HOST }}:${{ secrets.DEPLOYMENT_PATH }}
+
+          # Remove the key
+          rm -f ~/.ssh/deploy_key
+
+      - name: Restart Systemd Service via SSH
+        timeout-minutes: 1
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.DEPLOYMENT_HOST }}
+          username: ${{ secrets.DEPLOYMENT_USER }}
+          key: ${{ secrets.DEPLOYMENT_SSH_KEY }}
+          script: |
+            cd ${{ secrets.DEPLOYMENT_PATH }}
+
+            cat << 'EOF' > .env
+            PIPELINE=${{ secrets.PIPELINE || 'production' }}
+            STATIC_DIR=${{ secrets.STATIC_DIR || '/staticfiles' }}
+
+            # Nginx and Let's Encrypt settings
+            DOMAIN=${{ secrets.DOMAIN || '' }}
+            LETSENCRYPT_EMAIL=${{ secrets.LETSENCRYPT_EMAIL }}
+            PORT_HTTP=${{ secrets.PORT_HTTP || '80' }}
+            PORT_HTTPS=${{ secrets.PORT_HTTPS || '443' }}
+
+            # Mailing server
+            EMAIL_HOST=${{ secrets.EMAIL_HOST || '' }}
+            EMAIL_PORT=${{ secrets.EMAIL_PORT || '587' }}
+            EMAIL_HOST_USER=${{ secrets.EMAIL_HOST_USER || '' }}
+            EMAIL_HOST_PASSWORD=${{ secrets.EMAIL_HOST_PASSWORD || '' }}
+            EMAIL_DEFAULT_FROM=${{ secrets.EMAIL_DEFAULT_FROM || 'noreply@example.com' }}
+            EOF
+
+            echo "-> .env file successfully created."
+
+            export XDG_RUNTIME_DIR=/run/user/$(id -u)
+
+            echo "-> Restarting systemd service..."
+            # Forcefully fail if systemctl takes too long
+            timeout 30s systemctl --user restart ${{ secrets.DEPLOYMENT_SERVICE }} || {
+                echo "Error: Service restart timed out or failed!"
+                exit 1
+            }
+
+            # systemctl --user restart --no-block ${{ secrets.DEPLOYMENT_SERVICE }} # Restart asynchronously
+            # sleep 20  # wait for service to start, a longer wait may be needed
+
+            # echo "-> service status and recent container logs..."
+            # systemctl --user status ${{ secrets.DEPLOYMENT_SERVICE }} --no-pager
+
+            # cd ${{ secrets.DEPLOYMENT_PATH }}
+            # /usr/bin/podman-compose ps

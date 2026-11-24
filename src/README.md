@@ -1,41 +1,27 @@
-# Auvõlg OÜ veebileht
+# Auvõlg OÜ veebilehe lähtefailid
 
-Staatiline eestikeelne ühe lehe veebileht domeenile **auvolg.ee**. See eristab nõude müüki soovivaid ettevõtteid ja korteriühistuid eraisikutest, kes soovivad müüa vara, pärandiosa või kaasomandi osa. Auvõlg on sõnastatud nõuete ja varade ostjana, mitte tarbijalaenuandja ega tavapärase inkassoteenusena.
+Leht on eestikeelne staatiline veebisait, mida serveerib selle repositooriumi HAProxy seadistus.
 
-## Failid
+## Veebilehe failid
 
-- `index.html` — lehe sisu ja kontaktvorm
-- `styles.css` — kujundus ja mobiilivaade
-- `script.ts` — TypeScripti lähtekood
-- `script.js` — brauseris käivitatav kompileeritud JavaScript
-- `assets/auvolg-logo.png` — veebilehe päises ja jaluses kasutatav logo
+- `src/index.html` — lehe sisu, navigeerimine ja kontaktvorm
+- `src/styles.css` — kujundus ja mobiilivaade
+- `js/src/script.ts` — menüü, vormi valideerimise ja e-posti mustandi TypeScript
+- `assets/auvolg-logo.png` — veebilehe päise ja jaluse logo
 
-Kujunduse põhivärv pärineb logofaili dokumendipaletist: **Pantone 2767 C**, RGB ligikaudu `#142142`. Selle kõrval kasutatakse logo valget ja neutraalseid halle toone. Logo algne CDR-fail on vektorfail; veebilehe PNG on sellest eraldatud eelvaate põhjal loodud rasterversioon. Terava trüki- ja suure eraldusvõimega kasutuse jaoks ekspordi algsest CDR-ist eraldi kvaliteetne SVG või suurem PNG.
+Lehe põhivärv on logoga ühtlustatud `#00356d` (RGB 0, 53, 109); taustades on sobitatud helesiniseid halle ja valget. „Meist“ jaotis on menüüst leitav.
 
-Veebibrauser ei käivita TypeScripti otse. `script.js` on kaasas, nii et staatilist saiti saab avaldada ehitussammuta. TypeScripti muutmisel genereeri JavaScript uuesti, kasutades arvutisse paigaldatud `tsc` kompilaatorit:
-
-```sh
-tsc script.ts --target ES2020 --lib DOM,ES2020 --strict --outFile script.js
-```
+TypeScripti töötleb juurkausta `compose.yml`-i Bun ehitusteenus. Ehitatud `script.js` serveeritakse staatilise failina; seda ei hallata käsitsi `src`-kaustas.
 
 ## Enne avaldamist
 
-1. Muuda `CONTACT_EMAIL` väärtus failides `script.ts` ja `script.js` päris e-posti aadressiks. Lisa sama aadress `index.html` jalusesse ja `<noscript>` teatesse.
-2. Asenda jaluses `[LISA REGISTRIKOOD]`, `[LISA AADRESS]` ja `[LISA E-POST]` tegelike andmetega. Neid pole välja mõeldud.
-3. Vaata üle privaatsustekst ja täpsusta ettevõtte tegelik andmetöötleja, kontakt, andmete säilitamise tähtaeg ning andmesubjekti õiguste taotlemise kord. Lisa vajadusel eraldi privaatsusteatis.
-4. Kinnita enne avaldamist, et teenuste kirjeldus ja ostutingimused vastavad ettevõtte tegelikule tegevusele.
+- Muuda `CONTACT_EMAIL` väärtus failis `js/src/script.ts` päris e-posti aadressiks.
+- Lisa tegelik e-post, registrikood ja aadress `src/index.html` jalusesse.
+- Vaata üle privaatsustekst ja täpsusta andmetöötleja, säilitustähtaeg ning andmesubjekti õiguste taotlemise kord.
+- Kontrolli, et ettevõtte teenuste kirjeldus ja ostutingimused vastaksid tegelikule tegevusele.
 
-## Vorm ja andmekaitse
+Vorm ei saada päringut automaatselt serverisse. See avab kasutaja e-posti rakenduses eeltäidetud `mailto:` kirja; saatmiseks peab kasutaja ise vajutama „Saada“. Kui soovid automaatset vormisaatmist, lisa hiljem serveripoolne vormiteenus või e-posti API.
 
-Vorm ei saada andmeid serverisse ega salvesta neid veebilehel. Pärast nõutud väljade täitmist avab see kasutaja seadmes eeltäidetud `mailto:` kirja. Kasutaja peab kirja ise üle vaatama ja saatma. Kui kontakt-aadress on seadistamata, kuvatakse teade ning kirja ei avata. Automaatseks vormisaatmiseks on vaja eraldi serveripoolset vormiteenust või e-posti API-t; praegu seda ei väideta ega tehta.
+## Käivitamine ja avaldamine
 
-Vorm küsib vastamiseks vajalikku kontaktinfot, teemat ja vabatahtlikku lühikirjeldust. Külastajal palutakse mitte lisada isikukoode, pangateavet ega dokumente. `mailto:` toimimine sõltub kasutaja e-posti rakenduse seadistusest.
-
-## Avaldamine domeenile auvolg.ee
-
-1. Vali staatilise veebimajutuse teenus, mis pakub HTTPS-i, ning laadi `index.html`, `styles.css`, `script.js` ja `assets/auvolg-logo.png` teenuse veebijuurkausta (sageli `public` või `www`). Säilita `assets` alamkausta asukoht. `script.ts` ja see juhend on lähtefailid; brauseris käivitamiseks neid üles laadima ei pea.
-2. Lisa majutusteenuses domeen `auvolg.ee` (ja soovi korral `www.auvolg.ee`). Seadista domeeni DNS-kirjed majutusteenuse antud väärtustega. Väärtused sõltuvad valitud teenusepakkujast.
-3. Lülita sisse TLS-sertifikaat ja HTTP ümbersuunamine HTTPS-ile. Soovi korral suuna `www.auvolg.ee` ühele põhiaadressile.
-4. Ava avaldatud leht arvutis ja telefonis. Kontrolli navigeerimist, vormi valideerimist ning pärast päris e-posti aadressi lisamist e-kirja mustandi avanemist.
-
-Leht on tavaline staatiline sait: serverirakendust, andmebaasi ega ehitussammu pole vaja.
+Kasuta repositooriumi juurkausta `README.md` juhiseid. Need kirjeldavad `.env` seadistamist, HAProxy sertifikaati ja teenuste käivitamist käsuga `docker compose up -d --build`.

@@ -2,7 +2,6 @@ import { globSync } from 'fs';
 import path from 'path';
 
 const jsRoot = import.meta.dir;
-const outDir = path.resolve(jsRoot, '..', 'reWiLD', 'reWiLDsite', 'staticfiles');
 
 const entrypoints = globSync('./src/**/*.{js,ts,css}', {
     cwd: jsRoot,

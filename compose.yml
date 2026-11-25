@@ -75,7 +75,7 @@ services:
       - ./nginx/favicon.ico:/favicon.ico:ro
       - ./nginx/entrypoint.sh:/entrypoint.sh:ro
       - ./src:/usr/share/site/src:ro
-      - ./assets:/usr/share/site/assets:ro
+      - ./src/assets:/usr/share/site/assets:ro
       - staticfiles:${STATIC_DIR:-/staticfiles}
       - letsencrypt:/etc/letsencrypt
       - certbot_cache:/var/cache/certbot

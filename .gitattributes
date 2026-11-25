@@ -1,3 +1,6 @@
 # Ensure shell scripts always use LF line endings (/n not /r/n), even on Windows
 *.sh text eol=lf
 Dockerfile* text eol=lf
+
+# Windows batch scripts use CRLF line endings
+*.bat text eol=crlf

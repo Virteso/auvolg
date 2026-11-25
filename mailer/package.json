@@ -1,0 +1,9 @@
+{
+  "name": "mailer",
+  "module": "server.ts",
+  "type": "module",
+  "private": true,
+  "dependencies": {
+    "nodemailer": "^7"
+  }
+}

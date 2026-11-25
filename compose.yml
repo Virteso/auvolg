@@ -23,38 +23,26 @@ services:
         trap 'kill -TERM $$PID' SIGTERM SIGINT
         wait "$$PID"
 
-  # # HAProxy: TLS termination, HTTP/2 + HTTP/3, and static file serving.
-  # # Certificates are baked into the image from haproxy/certs/site.pem.
-  # haproxy:
-  #   build:
-  #     context: .
-  #     dockerfile: haproxy/Dockerfile.haproxy
-  #   stop_signal: SIGTERM
-  #   restart: on-failure:3
-  #   # Allow the unprivileged haproxy user to bind 80/443 inside the container.
-  #   sysctls:
-  #     net.ipv4.ip_unprivileged_port_start: "80"
-  #   ports:
-  #     - "${PORT_HTTP:-8080}:80"
-  #     - "${PORT_HTTPS:-8443}:443/tcp"
-  #     - "${PORT_HTTPS:-8443}:443/udp"
-  #   volumes:
-  #     - ./haproxy/conf:/usr/local/etc/haproxy/conf:ro
-  #     - ./haproxy/entrypoint.sh:/entrypoint.sh:ro
-  #     - ./haproxy/generate-routes.sh:/generate-routes.sh:ro
-  #     - ./src:/usr/share/site/src:ro
-  #     - ./assets:/usr/share/site/assets:ro
-  #     - staticfiles:${STATIC_DIR:-/staticfiles}
-  #   environment:
-  #     PIPELINE: ${PIPELINE:-production}
-  #     STATIC_DIR: ${STATIC_DIR:-/staticfiles}
-  #     SITE_DIR: /usr/share/site/src
-  #     ASSETS_DIR: /usr/share/site/assets
-  #     DOMAIN: ${DOMAIN}
-  #     PORT_HTTP: ${PORT_HTTP:-8080}
-  #     PORT_HTTPS: ${PORT_HTTPS:-8443}
-  #   depends_on:
-  #     - bun
+
+  # Contact-form mail relay (OCI Email Delivery over SMTP)
+  mailer:
+    build:
+      context: .
+      dockerfile: mailer/Dockerfile
+    stop_signal: SIGTERM
+    # Let the relay finish SMTP sends already in flight (nginx allows 30s).
+    stop_grace_period: 40s
+    restart: on-failure:3
+    environment:
+      MAILER_PORT: 8080
+      EMAIL_HOST: ${EMAIL_HOST}
+      EMAIL_PORT: ${EMAIL_PORT:-587}
+      EMAIL_HOST_USER: ${EMAIL_HOST_USER}
+      EMAIL_HOST_PASSWORD: ${EMAIL_HOST_PASSWORD}
+      EMAIL_DEFAULT_FROM: ${EMAIL_DEFAULT_FROM}
+      EMAIL_CONTACT_TO: ${EMAIL_CONTACT_TO}
+    networks:
+      - internal
 
 
   # Nginx reverse proxy service
@@ -90,7 +78,13 @@ services:
       PORT_HTTPS: ${PORT_HTTPS:-8443}
     depends_on:
       - bun
+      - mailer
+    networks:
+      - internal
 
+
+networks:
+  internal:
 
 volumes:
   staticfiles:

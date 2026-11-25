@@ -66,7 +66,11 @@ jobs:
             EMAIL_PORT=${{ secrets.EMAIL_PORT || '587' }}
             EMAIL_HOST_USER=${{ secrets.EMAIL_HOST_USER || '' }}
             EMAIL_HOST_PASSWORD=${{ secrets.EMAIL_HOST_PASSWORD || '' }}
-            EMAIL_DEFAULT_FROM=${{ secrets.EMAIL_DEFAULT_FROM || 'noreply@example.com' }}
+
+            # Approved sender address
+            EMAIL_DEFAULT_FROM=${{ secrets.EMAIL_DEFAULT_FROM || '' }}
+            # Where form notifications are delivered
+            EMAIL_CONTACT_TO=${{ secrets.EMAIL_CONTACT_TO || '' }}
             EOF
 
             echo "-> .env file successfully created."

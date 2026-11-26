@@ -6,10 +6,12 @@ services:
     restart: on-failure:3
     volumes:
       - ./js:/js
+      - ./src:/site-src:ro
       - staticfiles:${STATIC_DIR:-/staticfiles}
     environment:
       PIPELINE: ${PIPELINE:-production}
       STATIC_DIR: ${STATIC_DIR:-/staticfiles}
+      SITE_SRC_DIR: ${SITE_SRC_DIR:-/site-src}
       BUILD_MARKER: ${STATIC_DIR:-/staticfiles}/.bun-build-complete
     entrypoint:
       - /bin/sh

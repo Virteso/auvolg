@@ -37,8 +37,10 @@ mkdir -p "$GENERATED_DIR"
 GENERATED_STATIC_ALIAS="$GENERATED_DIR/static-alias.conf"
 GENERATED_STATIC_ROOT="$GENERATED_DIR/static-root.conf"
 GENERATED_SITE_ROOT="$GENERATED_DIR/site-root.conf"
+GENERATED_HTML_ROOT="$GENERATED_DIR/html-root.conf"
 GENERATED_ASSETS_ALIAS="$GENERATED_DIR/assets-alias.conf"
 GENERATED_SCRIPT_ALIAS="$GENERATED_DIR/script-alias.conf"
+GENERATED_STYLE_ALIAS="$GENERATED_DIR/style-alias.conf"
 GENERATED_SERVER_NAME="$GENERATED_DIR/server_name.conf"
 
 # Resolve the static files location for snippets/static.conf
@@ -55,9 +57,15 @@ render_site_paths() {
     escaped_assets=$(printf '%s' "$ASSETS_DIR" | sed -e 's/[\\"]/\\&/g')
     escaped_static=$(printf '%s' "$STATIC_DIR" | sed -e 's/[\\"]/\\&/g')
     printf 'root "%s";\n' "$escaped_site" >"$GENERATED_SITE_ROOT"
+    if [ "$PIPELINE" = "production" ]; then
+        printf 'root "%s";\n' "$escaped_static" >"$GENERATED_HTML_ROOT"
+    else
+        printf 'root "%s";\n' "$escaped_site" >"$GENERATED_HTML_ROOT"
+    fi
     printf 'alias "%s/";\n' "$escaped_assets" >"$GENERATED_ASSETS_ALIAS"
     printf 'alias "%s/script.js";\n' "$escaped_static" >"$GENERATED_SCRIPT_ALIAS"
-    echo "Resolved site root for ${SITE_DIR}, assets for ${ASSETS_DIR}, script for ${STATIC_DIR}/script.js"
+    printf 'alias "%s/styles.css";\n' "$escaped_static" >"$GENERATED_STYLE_ALIAS"
+    echo "Resolved site root for ${SITE_DIR}, HTML root for ${STATIC_DIR} (${PIPELINE}), assets for ${ASSETS_DIR}, script for ${STATIC_DIR}/script.js, stylesheet for ${STATIC_DIR}/styles.css"
 }
 
 render_server_name() {

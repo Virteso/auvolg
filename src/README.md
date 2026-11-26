@@ -13,7 +13,7 @@ Leht on eestikeelne staatiline veebisait, mida serveerib selle repositooriumi HA
 
 Lehe põhivärv on logoga ühtlustatud `#00356d` (RGB 0, 53, 109); taustades on sobitatud helesiniseid halle ja valget. „Meist“ jaotis on menüüst leitav.
 
-TypeScripti ja CSS-i töötleb juurkausta `compose.yml`-i Bun ehitusteenus. Ehitatud `script.js` ja `styles.css` serveeritakse staatiliste failidena.
+TypeScripti ja CSS-i töötleb juurkausta `compose.yml`-i Bun ehitusteenus. Ehitatud `script.js` ja `styles.css` serveeritakse staatiliste failidena. Produktsioonis minifitseeritakse ka HTML-failid ja tehakse neile `.gz`-failid; arenduskeskkonnas serveeritakse loetavaid lähtefaile.
 
 Lehe otse failina avamiseks ehita failid enne juurkaustas käsuga `build.bat` (Windows) või `./build.sh` (macOS/Linux). `script.js` jääb loetavaks, `styles.css` minifitseeritakse. Mõlemad tekivad HTML-failide kõrval ja on Gitis ignoreeritud.
 

@@ -8,3 +8,7 @@
 
 # HAProxy TLS bundles (contain private keys; baked into the image at build time)
 /haproxy/certs/*.pem
+
+# Generated site assets (run build.bat / build.sh)
+/src/script.js
+/src/styles.css

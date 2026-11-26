@@ -18,7 +18,13 @@ services:
         # Remove completion marker before rebuilding if it exists
         rm -f "$$BUILD_MARKER"
         bun install
-        bun run build.js &
+        if [ "$$PIPELINE" = "production" ]; then
+          echo "Building production bundle..."
+          bun run build.js &
+        else
+          echo "Building development bundle..."
+          bun run dev-build.js &
+        fi
         PID=$$!
         trap 'kill -TERM $$PID' SIGTERM SIGINT
         wait "$$PID"

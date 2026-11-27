@@ -5,7 +5,7 @@ import path from 'path';
 const GZIP_LEVEL = 9;
 // Keep in sync with gzip_min_length in nginx/nginx.conf.
 const GZIP_MIN_BYTES = 256;
-const COMPRESSIBLE_EXTENSIONS = new Set(['.js', '.mjs', '.css', '.json', '.svg', '.xml', '.txt', '.map']);
+const COMPRESSIBLE_EXTENSIONS = new Set(['.js', '.mjs', '.css', '.html', '.json', '.svg', '.xml', '.txt', '.map']);
 
 // Write a <file>.gz sidecar so nginx can serve it directly with gzip_static.
 export function gzipSidecar(filePath) {
